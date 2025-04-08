@@ -1,8 +1,7 @@
-# version: '3.8' # 이 라인은 삭제해도 됩니다.
 services:
   db:
     image: mysql:8.0
-    platform: linux/arm64  # <--- arm64 플랫폼 명시
+    platform: linux/arm64
     container_name: walkinggo-db
     environment:
       MYSQL_ROOT_PASSWORD: password
@@ -15,7 +14,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    platform: linux/arm64  # <--- arm64 플랫폼 명시 (build 하위가 아니라 app 서비스 바로 아래)
+    platform: linux/arm64
     container_name: walkinggo-app
     ports:
       - "8080:8080"
