@@ -19,10 +19,13 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/walkinggo?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: password
+      - JWT_SECRET=${JWT_SECRET}
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/walkinggo?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
     depends_on:
       - db
+    volumes:
+      - ./uploads/profile-pics:/app/uploads/profile-pics
 volumes:
   db-data:
