@@ -16,4 +16,7 @@ public class AuthenticationResponse {
 
     @Schema(description = "로그인한 사용자 아이디")
     private final String username;
+
+    @Schema(description = "응답 메시지")
+    private final String message;
 }
