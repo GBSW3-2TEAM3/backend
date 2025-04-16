@@ -13,4 +13,7 @@ public class SignupResponse {
 
     @Schema(description = "회원가입 성공 여부")
     private final boolean signUp;
+
+    @Schema(description = "응답 메시지")
+    private final String message;
 }
