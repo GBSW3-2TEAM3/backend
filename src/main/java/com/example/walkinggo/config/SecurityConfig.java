@@ -48,6 +48,8 @@ public class SecurityConfig {
                         .requestMatchers(AntPathRequestMatcher.antMatcher("/api-docs/**")).permitAll()
                         .requestMatchers(AntPathRequestMatcher.antMatcher("/webjars/**")).permitAll()
                         .requestMatchers(AntPathRequestMatcher.antMatcher(HttpMethod.OPTIONS, "/**")).permitAll()
+                        .requestMatchers(AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/api/groups/public")).authenticated()
+                        .requestMatchers(AntPathRequestMatcher.antMatcher("/api/groups/**")).authenticated()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement((session) -> session
