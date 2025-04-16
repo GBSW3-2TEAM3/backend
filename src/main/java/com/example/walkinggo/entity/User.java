@@ -1,10 +1,10 @@
 package com.example.walkinggo.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+import lombok.*;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "users")
@@ -27,4 +27,9 @@ public class User {
 
     @Transient
     private String passwordConfirm;
+
+    @ManyToMany(mappedBy = "members", fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Set<UserGroup> groups = new HashSet<>();
 }
