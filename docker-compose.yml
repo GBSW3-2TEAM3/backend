@@ -1,7 +1,6 @@
 services:
   db:
     image: mysql:8.0
-    platform: linux/arm64
     container_name: walkinggo-db
     environment:
       MYSQL_ROOT_PASSWORD: password
@@ -10,11 +9,11 @@ services:
       - "3306:3306"
     volumes:
       - db-data:/var/lib/mysql
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    platform: linux/arm64
     container_name: walkinggo-app
     ports:
       - "8080:8080"
@@ -27,5 +26,6 @@ services:
       - db
     volumes:
       - ./uploads/profile-pics:/app/uploads/profile-pics
+
 volumes:
   db-data:
