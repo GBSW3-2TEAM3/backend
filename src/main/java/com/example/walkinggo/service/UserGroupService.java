@@ -32,45 +32,67 @@ public class UserGroupService {
 
     @Transactional
     public GroupResponse createGroup(GroupCreationRequest request, String ownerUsername) {
-        User owner = userRepository.findByUsername(ownerUsername)
-                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다: " + ownerUsername));
+        logger.info(">>> [Service] createGroup 진입: User={}, GroupName={}", ownerUsername, request.getName());
+        try {
+            logger.debug(">>> [Service] UserRepository.findByUsername 호출: {}", ownerUsername);
+            User owner = userRepository.findByUsername(ownerUsername)
+                    .orElseThrow(() -> {
+                        logger.warn("<<< [Service] UserRepository.findByUsername 결과: 사용자 없음 - {}", ownerUsername);
+                        return new EntityNotFoundException("사용자를 찾을 수 없습니다: " + ownerUsername);
+                    });
+            logger.debug("<<< [Service] UserRepository.findByUsername 결과: 사용자 찾음 - {}", owner.getUsername());
 
-        UserGroup group = UserGroup.builder()
-                .name(request.getName())
-                .description(request.getDescription())
-                .owner(owner)
-                .isPublic(request.getIsPublic())
-                .build();
+            UserGroup group = UserGroup.builder()
+                    .name(request.getName())
+                    .description(request.getDescription())
+                    .owner(owner)
+                    .isPublic(request.getIsPublic())
+                    .build();
+            logger.debug(">>> [Service] UserGroup 객체 생성 완료 (참여 코드 생성 전)");
 
-        if (!request.getIsPublic()) {
-            group.setParticipationCode(generateUniqueParticipationCode());
+            if (!request.getIsPublic()) {
+                logger.debug(">>> [Service] generateUniqueParticipationCode 호출...");
+                group.setParticipationCode(generateUniqueParticipationCode());
+                logger.debug("<<< [Service] 생성된 참여 코드: {}", group.getParticipationCode());
+            }
+
+            logger.debug(">>> [Service] group.addMember(owner) 호출 전...");
+            group.addMember(owner);
+            logger.debug("<<< [Service] group.addMember(owner) 호출 완료.");
+
+
+            logger.debug(">>> [Service] UserGroupRepository.save 호출 전: {}", group.getName());
+            UserGroup savedGroup = userGroupRepository.save(group);
+            logger.info("<<< [Service] UserGroupRepository.save 호출 완료 (저장된 Group ID: {})", savedGroup.getId());
+
+            GroupResponse response = GroupResponse.fromEntity(savedGroup);
+            logger.info(">>> [Service] createGroup 정상 반환 직전: GroupResponse ID {}", response.getId());
+            return response;
+
+        } catch (EntityNotFoundException enfe) {
+            logger.warn("!!! [Service] createGroup 실행 중 사용자 못찾음 (EntityNotFoundException): {}", enfe.getMessage());
+            throw enfe;
+        } catch (Exception e) {
+            logger.error("!!! [Service] createGroup 실행 중 예외 발생: User={}, 예외 유형={}, 메시지={}",
+                    ownerUsername, e.getClass().getName(), e.getMessage(), e);
+            throw e;
         }
-
-        group.addMember(owner);
-        UserGroup savedGroup = userGroupRepository.save(group);
-        logger.info("그룹 생성 완료: {} (Owner: {})", savedGroup.getName(), ownerUsername);
-
-        return GroupResponse.fromEntity(savedGroup);
     }
 
     @Transactional
     public void joinPublicGroup(Long groupId, String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다: " + username));
-
         UserGroup group = userGroupRepository.findById(groupId)
                 .orElseThrow(() -> new EntityNotFoundException("그룹을 찾을 수 없습니다: ID " + groupId));
-
         if (!group.getIsPublic()) {
             logger.warn("공개 그룹이 아닙니다. 비공개 그룹 참가를 시도했습니다. Group ID: {}", groupId);
             throw new IllegalArgumentException("공개 그룹만 이 방법으로 참가할 수 있습니다.");
         }
-
         if (group.getMembers().contains(user)) {
             logger.warn("이미 그룹 멤버입니다. User: {}, Group ID: {}", username, groupId);
             throw new IllegalStateException("이미 해당 그룹의 멤버입니다.");
         }
-
         group.addMember(user);
         userGroupRepository.save(group);
         logger.info("사용자 '{}'가 공개 그룹 '{}'에 참가했습니다.", username, group.getName());
@@ -80,24 +102,20 @@ public class UserGroupService {
     public GroupResponse joinPrivateGroup(String participationCode, String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다: " + username));
-
         UserGroup group = userGroupRepository.findByParticipationCode(participationCode)
                 .orElseThrow(() -> new EntityNotFoundException("유효하지 않은 참가 코드입니다: " + participationCode));
-
         if (group.getIsPublic()) {
             logger.warn("비공개 그룹이 아닙니다. 공개 그룹 참가를 시도했습니다. Code: {}", participationCode);
             throw new IllegalArgumentException("비공개 그룹 참가는 코드를 통해서만 가능합니다.");
         }
-
         if (group.getMembers().contains(user)) {
             logger.warn("이미 그룹 멤버입니다. User: {}, Group Code: {}", username, participationCode);
             throw new IllegalStateException("이미 해당 그룹의 멤버입니다.");
         }
-
         group.addMember(user);
-        userGroupRepository.save(group);
+        UserGroup savedGroup = userGroupRepository.save(group);
         logger.info("사용자 '{}'가 비공개 그룹 '{}'에 참가했습니다.", username, group.getName());
-        return GroupResponse.fromEntity(group);
+        return GroupResponse.fromEntity(savedGroup);
     }
 
     public List<SimpleGroupResponse> getPublicGroups() {
@@ -118,15 +136,12 @@ public class UserGroupService {
                 .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다: " + username));
         UserGroup group = userGroupRepository.findById(groupId)
                 .orElseThrow(() -> new EntityNotFoundException("그룹을 찾을 수 없습니다: ID " + groupId));
-
         if (!group.getMembers().contains(user)) {
             throw new IllegalStateException("해당 그룹의 멤버가 아닙니다.");
         }
-
         if (group.getOwner().equals(user)) {
             throw new IllegalStateException("그룹장은 그룹을 탈퇴할 수 없습니다. 그룹을 삭제하거나 관리자를 위임하세요.");
         }
-
         group.removeMember(user);
         userGroupRepository.save(group);
         logger.info("사용자 '{}'가 그룹 '{}'에서 탈퇴했습니다.", username, group.getName());
@@ -138,7 +153,6 @@ public class UserGroupService {
                 .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다: " + username));
         UserGroup group = userGroupRepository.findById(groupId)
                 .orElseThrow(() -> new EntityNotFoundException("그룹을 찾을 수 없습니다: ID " + groupId));
-
         if (!group.getOwner().equals(user)) {
             logger.warn("그룹 삭제 권한 없음 - 요청자: {}, 그룹 소유자: {}", username, group.getOwner().getUsername());
             throw new AccessDeniedException("그룹 소유자만 그룹을 삭제할 수 있습니다.");
@@ -146,7 +160,6 @@ public class UserGroupService {
         userGroupRepository.delete(group);
         logger.info("그룹 '{}'(ID: {})가 사용자 '{}'에 의해 삭제되었습니다.", group.getName(), groupId, username);
     }
-
 
     private String generateUniqueParticipationCode() {
         String code;
