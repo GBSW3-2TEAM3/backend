@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -42,6 +43,8 @@ public class UserGroupController {
     @ApiResponse(responseCode = "500", description = "서버 내부 오류", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping
     public ResponseEntity<?> createGroup(@Valid @RequestBody GroupCreationRequest request, @Parameter(hidden = true) @AuthenticationPrincipal UserDetails userDetails) {
+        logger.error("<<<<< createGroup Controller Method Entered >>>>>");
+
         if (userDetails == null) {
             return new ResponseEntity<>(new ErrorResponse("인증 정보가 없습니다."), HttpStatus.UNAUTHORIZED);
         }
@@ -50,13 +53,21 @@ public class UserGroupController {
 
         try {
             GroupResponse groupResponse = userGroupService.createGroup(request, username);
-            logger.info("그룹 생성 성공: 그룹 ID={}, 그룹명='{}'", groupResponse.getId(), groupResponse.getName());
-            return new ResponseEntity<>(groupResponse, HttpStatus.CREATED);
+
+            if (groupResponse != null) {
+                logger.info("서비스 호출 성공. 반환될 GroupResponse ID: {}", groupResponse.getId());
+            } else {
+                logger.error("서비스 호출 후 groupResponse가 null입니다!");
+            }
+            HttpStatus status = HttpStatus.CREATED;
+            logger.info("응답 반환 직전: 상태 코드 = {}, 응답 본문 객체 = {}", status.value(), groupResponse);
+
+            return new ResponseEntity<>(groupResponse, status);
         } catch (EntityNotFoundException e) {
             logger.warn("그룹 생성 실패 (사용자 없음): 사용자='{}', 메시지={}", username, e.getMessage());
             return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.BAD_REQUEST);
         } catch (Exception e) {
-            logger.error("그룹 생성 중 예상치 못한 오류 발생: 사용자='{}'", username, e);
+            logger.error("최종 catch 블록에서 예외 발생: 사용자='{}', 예외 유형={}, 메시지={}", username, e.getClass().getName(), e.getMessage(), e);
             return new ResponseEntity<>(new ErrorResponse("그룹 생성 중 오류가 발생했습니다."), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
