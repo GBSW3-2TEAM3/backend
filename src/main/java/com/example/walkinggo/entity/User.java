@@ -32,4 +32,8 @@ public class User {
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private Set<UserGroup> groups = new HashSet<>();
+
+    @Schema(description = "사용자 체중 (kg)", example = "70.5")
+    @Column
+    private Double weightKg;
 }
