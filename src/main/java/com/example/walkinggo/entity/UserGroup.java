@@ -3,7 +3,6 @@ package com.example.walkinggo.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -24,7 +23,7 @@ public class UserGroup {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(length = 100)
+    @Column(length = 500, nullable = true)
     private String description;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -34,7 +33,7 @@ public class UserGroup {
     @Column(nullable = false)
     private Boolean isPublic;
 
-    @Column(unique = true, length = 10)
+    @Column(unique = true, length = 50, nullable = true)
     private String participationCode;
 
     @ManyToMany(fetch = FetchType.LAZY)
