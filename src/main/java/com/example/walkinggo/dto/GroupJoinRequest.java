@@ -10,6 +10,6 @@ import lombok.Setter;
 public class GroupJoinRequest {
 
     @NotBlank(message = "참가 코드를 입력해주세요.")
-    @Schema(description = "비공개 그룹 참가 코드", example = "AB12CD")
+    @Schema(description = "비공개 그룹 참가 코드", example = "123456")
     private String participationCode;
 }
