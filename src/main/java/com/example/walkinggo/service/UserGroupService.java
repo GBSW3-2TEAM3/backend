@@ -14,8 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
-
-import java.security.SecureRandom;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,52 +24,53 @@ public class UserGroupService {
     private final UserGroupRepository userGroupRepository;
     private final UserRepository userRepository;
     private final Logger logger = LoggerFactory.getLogger(UserGroupService.class);
-    private static final String CODE_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    private static final int CODE_LENGTH = 6;
-    private static final SecureRandom random = new SecureRandom();
 
     @Transactional
     public GroupResponse createGroup(GroupCreationRequest request, String ownerUsername) {
         logger.info(">>> [Service] createGroup 진입: User={}, GroupName={}", ownerUsername, request.getName());
         try {
-            logger.debug(">>> [Service] UserRepository.findByUsername 호출: {}", ownerUsername);
             User owner = userRepository.findByUsername(ownerUsername)
                     .orElseThrow(() -> {
                         logger.warn("<<< [Service] UserRepository.findByUsername 결과: 사용자 없음 - {}", ownerUsername);
                         return new EntityNotFoundException("사용자를 찾을 수 없습니다: " + ownerUsername);
                     });
-            logger.debug("<<< [Service] UserRepository.findByUsername 결과: 사용자 찾음 - {}", owner.getUsername());
 
-            UserGroup group = UserGroup.builder()
+            UserGroup.UserGroupBuilder groupBuilder = UserGroup.builder()
                     .name(request.getName())
-                    .description(request.getDescription())
                     .owner(owner)
-                    .isPublic(request.getIsPublic())
-                    .build();
-            logger.debug(">>> [Service] UserGroup 객체 생성 완료 (참여 코드 생성 전)");
+                    .isPublic(request.getIsPublic());
 
-            if (!request.getIsPublic()) {
-                logger.debug(">>> [Service] generateUniqueParticipationCode 호출...");
-                group.setParticipationCode(generateUniqueParticipationCode());
-                logger.debug("<<< [Service] 생성된 참여 코드: {}", group.getParticipationCode());
+            if (request.getIsPublic()) {
+                groupBuilder.description(request.getDescription());
+                groupBuilder.participationCode(null);
+            } else {
+                if (request.getParticipationCode() == null || request.getParticipationCode().trim().isEmpty()) { // String에 맞게 수정
+                    logger.warn("비공개 그룹 생성 시 참여 코드가 필요합니다. User: {}", ownerUsername);
+                    throw new IllegalArgumentException("비공개 그룹을 생성하려면 참여 코드를 입력해야 합니다.");
+                }
+                // DTO에서 @Pattern으로 숫자만 입력되도록 검증했으므로, 여기서는 중복만 체크
+                if (userGroupRepository.existsByParticipationCode(request.getParticipationCode())) {
+                    logger.warn("이미 사용 중인 참여 코드입니다: {}", request.getParticipationCode());
+                    throw new IllegalStateException("이미 사용 중인 참여 코드입니다. 다른 코드를 입력해주세요.");
+                }
+                groupBuilder.participationCode(request.getParticipationCode());
+                groupBuilder.description(null);
             }
 
-            logger.debug(">>> [Service] group.addMember(owner) 호출 전...");
+            UserGroup group = groupBuilder.build();
             group.addMember(owner);
-            logger.debug("<<< [Service] group.addMember(owner) 호출 완료.");
 
-
-            logger.debug(">>> [Service] UserGroupRepository.save 호출 전: {}", group.getName());
             UserGroup savedGroup = userGroupRepository.save(group);
             logger.info("<<< [Service] UserGroupRepository.save 호출 완료 (저장된 Group ID: {})", savedGroup.getId());
 
-            GroupResponse response = GroupResponse.fromEntity(savedGroup);
-            logger.info(">>> [Service] createGroup 정상 반환 직전: GroupResponse ID {}", response.getId());
-            return response;
+            return GroupResponse.fromEntity(savedGroup);
 
         } catch (EntityNotFoundException enfe) {
             logger.warn("!!! [Service] createGroup 실행 중 사용자 못찾음 (EntityNotFoundException): {}", enfe.getMessage());
             throw enfe;
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            logger.warn("!!! [Service] createGroup 실행 중 오류: {}", ex.getMessage());
+            throw ex;
         } catch (Exception e) {
             logger.error("!!! [Service] createGroup 실행 중 예외 발생: User={}, 예외 유형={}, 메시지={}",
                     ownerUsername, e.getClass().getName(), e.getMessage(), e);
@@ -99,15 +98,17 @@ public class UserGroupService {
     }
 
     @Transactional
-    public GroupResponse joinPrivateGroup(String participationCode, String username) {
+    public GroupResponse joinPrivateGroup(String participationCode, String username) { // String으로 변경
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다: " + username));
-        UserGroup group = userGroupRepository.findByParticipationCode(participationCode)
+        UserGroup group = userGroupRepository.findByParticipationCode(participationCode) // String으로 변경
                 .orElseThrow(() -> new EntityNotFoundException("유효하지 않은 참가 코드입니다: " + participationCode));
+
         if (group.getIsPublic()) {
             logger.warn("비공개 그룹이 아닙니다. 공개 그룹 참가를 시도했습니다. Code: {}", participationCode);
             throw new IllegalArgumentException("비공개 그룹 참가는 코드를 통해서만 가능합니다.");
         }
+
         if (group.getMembers().contains(user)) {
             logger.warn("이미 그룹 멤버입니다. User: {}, Group Code: {}", username, participationCode);
             throw new IllegalStateException("이미 해당 그룹의 멤버입니다.");
@@ -159,21 +160,5 @@ public class UserGroupService {
         }
         userGroupRepository.delete(group);
         logger.info("그룹 '{}'(ID: {})가 사용자 '{}'에 의해 삭제되었습니다.", group.getName(), groupId, username);
-    }
-
-    private String generateUniqueParticipationCode() {
-        String code;
-        do {
-            code = generateRandomCode();
-        } while (userGroupRepository.existsByParticipationCode(code));
-        return code;
-    }
-
-    private String generateRandomCode() {
-        StringBuilder sb = new StringBuilder(CODE_LENGTH);
-        for (int i = 0; i < CODE_LENGTH; i++) {
-            sb.append(CODE_CHARACTERS.charAt(random.nextInt(CODE_CHARACTERS.length())));
-        }
-        return sb.toString();
     }
 }
