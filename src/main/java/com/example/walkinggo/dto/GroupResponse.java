@@ -3,7 +3,6 @@ package com.example.walkinggo.dto;
 import com.example.walkinggo.entity.UserGroup;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
-
 import java.time.LocalDateTime;
 
 @Getter
@@ -13,13 +12,13 @@ public class GroupResponse {
     private final Long id;
     @Schema(description = "그룹 이름")
     private final String name;
-    @Schema(description = "그룹 설명")
+    @Schema(description = "그룹 설명 (공개 그룹인 경우)")
     private final String description;
     @Schema(description = "그룹 생성자 아이디")
     private final String ownerUsername;
     @Schema(description = "공개 여부")
     private final Boolean isPublic;
-    @Schema(description = "비공개 그룹 참가 코드")
+    @Schema(description = "비공개 그룹 참가 코드 (숫자로만 구성된 문자열, 비공개 그룹인 경우)")
     private final String participationCode;
     @Schema(description = "현재 멤버 수")
     private final int memberCount;
