@@ -1,7 +1,9 @@
 package com.example.walkinggo.service;
 
+import com.example.walkinggo.dto.UserProfileResponse;
 import com.example.walkinggo.entity.User;
 import com.example.walkinggo.repository.UserRepository;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -52,5 +54,14 @@ public class UserService {
             logger.error("사용자 조회 중 오류 발생: {}", e.getMessage());
             throw e;
         }
+    }
+
+    public UserProfileResponse getUserProfile(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> {
+                    logger.warn("프로필 조회 시 사용자를 찾을 수 없음: {}", username);
+                    return new EntityNotFoundException("사용자를 찾을 수 없습니다: " + username);
+                });
+        return UserProfileResponse.fromEntity(user);
     }
 }
