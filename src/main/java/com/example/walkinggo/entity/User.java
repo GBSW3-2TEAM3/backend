@@ -36,4 +36,8 @@ public class User {
     @Schema(description = "사용자 체중 (kg)", example = "70.5")
     @Column
     private Double weightKg;
+
+    @Schema(description = "사용자 목표 거리 (km)", example = "5.0")
+    @Column
+    private Double targetDistanceKm;
 }
