@@ -21,7 +21,7 @@ public class JwtUtil {
     @Value("${jwt.secret}")
     private String secret;
 
-    private static final long JWT_TOKEN_VALIDITY = 5 * 60 * 60; // 5시간
+    private static final long JWT_TOKEN_VALIDITY = 30 * 60L;
     private final Logger logger = LoggerFactory.getLogger(JwtUtil.class);
 
     public String generateToken(UserDetails userDetails) {
