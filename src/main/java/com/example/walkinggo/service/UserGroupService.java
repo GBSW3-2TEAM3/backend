@@ -2,18 +2,21 @@ package com.example.walkinggo.service;
 
 import com.example.walkinggo.dto.GroupCreationRequest;
 import com.example.walkinggo.dto.GroupResponse;
+import com.example.walkinggo.dto.RankedGroupResponse;
 import com.example.walkinggo.dto.SimpleGroupResponse;
 import com.example.walkinggo.entity.User;
 import com.example.walkinggo.entity.UserGroup;
 import com.example.walkinggo.repository.UserGroupRepository;
 import com.example.walkinggo.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -128,5 +131,19 @@ public class UserGroupService {
             throw new AccessDeniedException("그룹 소유자만 그룹을 삭제할 수 있습니다.");
         }
         userGroupRepository.delete(group);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RankedGroupResponse> getRankedPublicGroupsByDistance() {
+        List<Object[]> results = userGroupRepository.findPublicGroupsRankedByTotalDistance();
+        List<RankedGroupResponse> rankedGroups = new ArrayList<>();
+        int rank = 1;
+        for (Object[] result : results) {
+            UserGroup group = (UserGroup) result[0];
+            Double totalDistanceMeters = (Double) result[1];
+            rankedGroups.add(new RankedGroupResponse(group, totalDistanceMeters, rank++));
+        }
+        logger.info("공개 그룹 랭킹 (거리순) 조회 완료. 총 {}개 그룹.", rankedGroups.size());
+        return rankedGroups;
     }
 }
