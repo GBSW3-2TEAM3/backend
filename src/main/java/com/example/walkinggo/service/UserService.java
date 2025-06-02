@@ -1,16 +1,24 @@
 package com.example.walkinggo.service;
 
+import com.example.walkinggo.dto.SimpleGroupResponse;
 import com.example.walkinggo.dto.UserProfileResponse;
+import com.example.walkinggo.dto.UserUpdateRequest;
 import com.example.walkinggo.entity.User;
+import com.example.walkinggo.entity.UserGroup;
 import com.example.walkinggo.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +40,12 @@ public class UserService {
                 throw new IllegalArgumentException("비밀번호와 비밀번호 확인이 일치하지 않습니다.");
             }
             user.setPassword(passwordEncoder.encode(user.getPassword()));
+            if (user.getWeightKg() == null) {
+                // user.setWeightKg(0.0); // 필요하다면 기본값 설정
+            }
+            if (user.getTargetDistanceKm() == null) {
+                // user.setTargetDistanceKm(0.0); // 필요하다면 기본값 설정
+            }
             User savedUser = userRepository.save(user);
             logger.info("사용자 등록 성공: {}", savedUser.getUsername());
             return savedUser;
@@ -56,6 +70,7 @@ public class UserService {
         }
     }
 
+    @Transactional(readOnly = true)
     public UserProfileResponse getUserProfile(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> {
@@ -63,5 +78,46 @@ public class UserService {
                     return new EntityNotFoundException("사용자를 찾을 수 없습니다: " + username);
                 });
         return UserProfileResponse.fromEntity(user);
+    }
+
+    @Transactional
+    public UserProfileResponse updateUserProfile(String username, UserUpdateRequest request) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다: " + username));
+
+        boolean updated = false;
+        if (request.getWeightKg() != null) {
+            user.setWeightKg(request.getWeightKg());
+            updated = true;
+        }
+        if (request.getTargetDistanceKm() != null) {
+            user.setTargetDistanceKm(request.getTargetDistanceKm());
+            updated = true;
+        }
+
+        if (updated) {
+            User updatedUser = userRepository.save(user);
+            logger.info("사용자 정보 업데이트 성공: {}", username);
+            return UserProfileResponse.fromEntity(updatedUser);
+        } else {
+            logger.info("사용자 정보 업데이트 요청이 있었으나 변경 사항 없음: {}", username);
+            return UserProfileResponse.fromEntity(user);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<SimpleGroupResponse> getUserJoinedGroups(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다: " + username));
+
+        Set<UserGroup> joinedGroups = user.getGroups();
+        if (joinedGroups == null || joinedGroups.isEmpty()) {
+            logger.info("{} 사용자가 가입한 그룹이 없습니다.", username);
+            return List.of();
+        }
+        logger.info("{} 사용자가 가입한 그룹 {}개 조회.", username, joinedGroups.size());
+        return joinedGroups.stream()
+                .map(SimpleGroupResponse::fromEntity)
+                .collect(Collectors.toList());
     }
 }
