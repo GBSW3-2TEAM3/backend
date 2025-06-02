@@ -21,7 +21,7 @@ public class WalkLog {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    private User user; // 어느 사용자의 기록인지
+    private User user;
 
     @Column(nullable = false)
     private LocalDateTime startTime; // 산책 시작 시간
@@ -32,6 +32,8 @@ public class WalkLog {
     private Long durationSeconds; // 산책 시간 (초)
 
     private Double distanceMeters; // 산책 거리 (미터)
+
+    private Integer steps; // 걸음 수
 
     private Double caloriesBurned; // 소모 칼로리
 
