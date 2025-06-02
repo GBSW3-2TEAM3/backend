@@ -4,6 +4,7 @@ import com.example.walkinggo.dto.ErrorResponse;
 import com.example.walkinggo.dto.GroupCreationRequest;
 import com.example.walkinggo.dto.GroupJoinRequest;
 import com.example.walkinggo.dto.GroupResponse;
+import com.example.walkinggo.dto.RankedGroupResponse;
 import com.example.walkinggo.dto.SimpleGroupResponse;
 import com.example.walkinggo.service.UserGroupService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -197,6 +198,22 @@ public class UserGroupController {
             return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.FORBIDDEN);
         } catch (Exception e) {
             return new ResponseEntity<>(new ErrorResponse("그룹 삭제 처리 중 오류 발생"), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Operation(summary = "팀 랭킹 조회 (총 이동 거리 순)", description = "공개 그룹들의 멤버 총 이동 거리를 기준으로 랭킹을 조회합니다.")
+    @ApiResponse(responseCode = "200", description = "팀 랭킹 조회 성공",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = RankedGroupResponse.class)))
+    @ApiResponse(responseCode = "500", description = "서버 내부 오류",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
+    @GetMapping("/ranked-by-distance")
+    public ResponseEntity<?> getRankedGroupsByDistance() {
+        try {
+            List<RankedGroupResponse> rankedGroups = userGroupService.getRankedPublicGroupsByDistance();
+            return ResponseEntity.ok(rankedGroups);
+        } catch (Exception e) {
+            logger.error("팀 랭킹(거리순) 조회 중 오류 발생", e);
+            return new ResponseEntity<>(new ErrorResponse("팀 랭킹 조회 중 오류가 발생했습니다."), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }
