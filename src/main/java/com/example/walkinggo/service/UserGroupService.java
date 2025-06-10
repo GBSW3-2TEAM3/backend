@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,6 +33,10 @@ public class UserGroupService {
     public GroupResponse createGroup(GroupCreationRequest request, String ownerUsername) {
         User owner = userRepository.findByUsername(ownerUsername)
                 .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다: " + ownerUsername));
+
+        if (!owner.getGroups().isEmpty()) {
+            throw new IllegalStateException("이미 다른 그룹에 가입되어 있습니다. 한 명의 사용자는 하나의 그룹에만 가입할 수 있습니다.");
+        }
 
         UserGroup.UserGroupBuilder groupBuilder = UserGroup.builder()
                 .name(request.getName())
@@ -62,6 +67,11 @@ public class UserGroupService {
     public GroupResponse joinPrivateGroup(String participationCode, String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다: " + username));
+
+        if (!user.getGroups().isEmpty()) {
+            throw new IllegalStateException("이미 다른 그룹에 가입되어 있습니다. 한 명의 사용자는 하나의 그룹에만 가입할 수 있습니다.");
+        }
+
         UserGroup group = userGroupRepository.findByParticipationCode(participationCode)
                 .orElseThrow(() -> new EntityNotFoundException("유효하지 않은 참가 코드입니다: " + participationCode));
 
@@ -69,9 +79,6 @@ public class UserGroupService {
             throw new IllegalArgumentException("비공개 그룹 참가는 코드를 통해서만 가능합니다.");
         }
 
-        if (group.getMembers().contains(user)) {
-            throw new IllegalStateException("이미 해당 그룹의 멤버입니다.");
-        }
         group.addMember(user);
         UserGroup savedGroup = userGroupRepository.save(group);
         return GroupResponse.fromEntity(savedGroup);
@@ -81,14 +88,17 @@ public class UserGroupService {
     public void joinPublicGroup(Long groupId, String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다: " + username));
+
+        if (!user.getGroups().isEmpty()) {
+            throw new IllegalStateException("이미 다른 그룹에 가입되어 있습니다. 한 명의 사용자는 하나의 그룹에만 가입할 수 있습니다.");
+        }
+
         UserGroup group = userGroupRepository.findById(groupId)
                 .orElseThrow(() -> new EntityNotFoundException("그룹을 찾을 수 없습니다: ID " + groupId));
         if (!group.getIsPublic()) {
             throw new IllegalArgumentException("공개 그룹만 이 방법으로 참가할 수 있습니다.");
         }
-        if (group.getMembers().contains(user)) {
-            throw new IllegalStateException("이미 해당 그룹의 멤버입니다.");
-        }
+
         group.addMember(user);
         userGroupRepository.save(group);
     }
@@ -115,10 +125,15 @@ public class UserGroupService {
             throw new IllegalStateException("해당 그룹의 멤버가 아닙니다.");
         }
         if (group.getOwner().equals(user)) {
-            throw new IllegalStateException("그룹장은 그룹을 탈퇴할 수 없습니다. 그룹을 삭제하거나 관리자를 위임하세요.");
+            if (group.getMembers().size() > 1) {
+                throw new IllegalStateException("그룹장은 그룹을 탈퇴할 수 없습니다. 그룹을 삭제하거나 다른 멤버에게 그룹장을 위임해야 합니다.");
+            }
+            logger.info("마지막 멤버인 그룹장 {}가 탈퇴하여 그룹(ID:{})을 삭제합니다.", username, groupId);
+            deleteGroup(groupId, username);
+        } else {
+            group.removeMember(user);
+            userGroupRepository.save(group);
         }
-        group.removeMember(user);
-        userGroupRepository.save(group);
     }
 
     @Transactional
@@ -130,18 +145,22 @@ public class UserGroupService {
         if (!group.getOwner().equals(user)) {
             throw new AccessDeniedException("그룹 소유자만 그룹을 삭제할 수 있습니다.");
         }
+
+        Set<User> members = group.getMembers();
+        for(User member : members) {
+            member.getGroups().remove(group);
+        }
+
         userGroupRepository.delete(group);
     }
 
     @Transactional(readOnly = true)
     public List<RankedGroupResponse> getRankedPublicGroupsByDistance() {
-        List<Object[]> results = userGroupRepository.findPublicGroupsRankedByTotalDistance();
+        List<UserGroup> groups = userGroupRepository.findByIsPublicTrueOrderByTotalDistanceMetersDescNameAsc();
         List<RankedGroupResponse> rankedGroups = new ArrayList<>();
         int rank = 1;
-        for (Object[] result : results) {
-            UserGroup group = (UserGroup) result[0];
-            Double totalDistanceMeters = (Double) result[1];
-            rankedGroups.add(new RankedGroupResponse(group, totalDistanceMeters, rank++));
+        for (UserGroup group : groups) {
+            rankedGroups.add(new RankedGroupResponse(group, group.getTotalDistanceMeters(), rank++));
         }
         logger.info("공개 그룹 랭킹 (거리순) 조회 완료. 총 {}개 그룹.", rankedGroups.size());
         return rankedGroups;
