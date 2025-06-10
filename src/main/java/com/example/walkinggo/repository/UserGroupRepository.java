@@ -22,12 +22,5 @@ public interface UserGroupRepository extends JpaRepository<UserGroup, Long> {
 
     List<UserGroup> findByNameContainingIgnoreCaseAndIsPublicTrue(String name);
 
-    @Query("SELECT ug, COALESCE(SUM(wl.distanceMeters), 0.0) as totalDistance " +
-            "FROM UserGroup ug " +
-            "LEFT JOIN ug.members m " +
-            "LEFT JOIN WalkLog wl ON wl.user = m " +
-            "WHERE ug.isPublic = true " +
-            "GROUP BY ug.id " +
-            "ORDER BY totalDistance DESC, ug.name ASC")
-    List<Object[]> findPublicGroupsRankedByTotalDistance();
+    List<UserGroup> findByIsPublicTrueOrderByTotalDistanceMetersDescNameAsc();
 }
