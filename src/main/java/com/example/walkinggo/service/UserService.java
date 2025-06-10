@@ -41,10 +41,8 @@ public class UserService {
             }
             user.setPassword(passwordEncoder.encode(user.getPassword()));
             if (user.getWeightKg() == null) {
-                // user.setWeightKg(0.0); // 필요하다면 기본값 설정
             }
             if (user.getTargetDistanceKm() == null) {
-                // user.setTargetDistanceKm(0.0); // 필요하다면 기본값 설정
             }
             User savedUser = userRepository.save(user);
             logger.info("사용자 등록 성공: {}", savedUser.getUsername());
@@ -103,6 +101,26 @@ public class UserService {
             logger.info("사용자 정보 업데이트 요청이 있었으나 변경 사항 없음: {}", username);
             return UserProfileResponse.fromEntity(user);
         }
+    }
+
+    @Transactional
+    public UserProfileResponse updateUserWeight(String username, Double weightKg) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다: " + username));
+        user.setWeightKg(weightKg);
+        User updatedUser = userRepository.save(user);
+        logger.info("사용자 체중 업데이트 성공: {}", username);
+        return UserProfileResponse.fromEntity(updatedUser);
+    }
+
+    @Transactional
+    public UserProfileResponse updateUserTargetDistance(String username, Double targetDistanceKm) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다: " + username));
+        user.setTargetDistanceKm(targetDistanceKm);
+        User updatedUser = userRepository.save(user);
+        logger.info("사용자 목표 거리 업데이트 성공: {}", username);
+        return UserProfileResponse.fromEntity(updatedUser);
     }
 
     @Transactional(readOnly = true)
