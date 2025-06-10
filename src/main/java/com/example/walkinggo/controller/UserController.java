@@ -1,9 +1,6 @@
 package com.example.walkinggo.controller;
 
-import com.example.walkinggo.dto.ErrorResponse;
-import com.example.walkinggo.dto.SimpleGroupResponse;
-import com.example.walkinggo.dto.UserProfileResponse;
-import com.example.walkinggo.dto.UserUpdateRequest;
+import com.example.walkinggo.dto.*;
 import com.example.walkinggo.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -20,11 +17,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController
@@ -66,7 +60,7 @@ public class UserController {
         }
     }
 
-    @Operation(summary = "내 프로필 정보 수정", description = "현재 로그인된 사용자의 몸무게, 목표 거리 등을 수정합니다.")
+    @Operation(summary = "내 프로필 정보 수정 (전체)", description = "현재 로그인된 사용자의 몸무게, 목표 거리 등을 수정합니다. 일부 필드만 선택적으로 수정 가능합니다.")
     @ApiResponse(responseCode = "200", description = "프로필 정보 수정 성공",
             content = @Content(schema = @Schema(implementation = UserProfileResponse.class)))
     @ApiResponse(responseCode = "400", description = "잘못된 요청 데이터 (예: 유효성 검사 실패)",
@@ -101,6 +95,44 @@ public class UserController {
         catch (Exception e) {
             logger.error("내 프로필 정보 수정 중 서버 오류 발생: 사용자='{}'", username, e);
             return new ResponseEntity<>(new ErrorResponse("프로필 정보 수정 중 오류가 발생했습니다."), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Operation(summary = "내 체중 수정", description = "현재 로그인된 사용자의 체중(kg)만 수정합니다.")
+    @ApiResponse(responseCode = "200", description = "체중 수정 성공",
+            content = @Content(schema = @Schema(implementation = UserProfileResponse.class)))
+    @PatchMapping("/me/profile/weight")
+    public ResponseEntity<?> updateMyWeight(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody UserWeightUpdateRequest request) {
+        if (userDetails == null) {
+            return new ResponseEntity<>(new ErrorResponse("인증 정보가 없습니다."), HttpStatus.UNAUTHORIZED);
+        }
+        String username = userDetails.getUsername();
+        try {
+            UserProfileResponse updatedProfile = userService.updateUserWeight(username, request.getWeightKg());
+            return ResponseEntity.ok(updatedProfile);
+        } catch (EntityNotFoundException e) {
+            return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @Operation(summary = "내 목표 거리 수정", description = "현재 로그인된 사용자의 목표 거리(km)만 수정합니다.")
+    @ApiResponse(responseCode = "200", description = "목표 거리 수정 성공",
+            content = @Content(schema = @Schema(implementation = UserProfileResponse.class)))
+    @PatchMapping("/me/profile/target-distance")
+    public ResponseEntity<?> updateMyTargetDistance(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody UserTargetDistanceUpdateRequest request) {
+        if (userDetails == null) {
+            return new ResponseEntity<>(new ErrorResponse("인증 정보가 없습니다."), HttpStatus.UNAUTHORIZED);
+        }
+        String username = userDetails.getUsername();
+        try {
+            UserProfileResponse updatedProfile = userService.updateUserTargetDistance(username, request.getTargetDistanceKm());
+            return ResponseEntity.ok(updatedProfile);
+        } catch (EntityNotFoundException e) {
+            return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.NOT_FOUND);
         }
     }
 
