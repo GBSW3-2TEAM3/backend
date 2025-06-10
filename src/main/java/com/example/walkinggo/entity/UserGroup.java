@@ -1,5 +1,6 @@
 package com.example.walkinggo.entity;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -48,6 +49,10 @@ public class UserGroup {
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Schema(description = "팀의 총 누적 이동 거리 (미터 단위)")
+    @Column(nullable = false, columnDefinition = "DOUBLE DEFAULT 0.0")
+    private Double totalDistanceMeters = 0.0;
 
     public void addMember(User user) {
         this.members.add(user);
