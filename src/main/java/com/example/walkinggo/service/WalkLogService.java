@@ -4,11 +4,12 @@ import com.example.walkinggo.dto.MonthlyActivityResponse;
 import com.example.walkinggo.dto.WalkLogRequest;
 import com.example.walkinggo.dto.WalkLogResponse;
 import com.example.walkinggo.entity.User;
+import com.example.walkinggo.entity.UserGroup;
 import com.example.walkinggo.entity.WalkLog;
 import com.example.walkinggo.repository.UserRepository;
 import com.example.walkinggo.repository.WalkLogRepository;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,13 +54,30 @@ public class WalkLogService {
                 .endTime(request.getEndTime())
                 .durationSeconds(durationSeconds)
                 .distanceMeters(request.getDistanceMeters())
+                .steps(request.getSteps())
                 .caloriesBurned(caloriesBurned)
                 .routeCoordinatesJson(request.getRouteCoordinatesJson())
                 .build();
 
         WalkLog savedLog = walkLogRepository.save(walkLog);
         logger.info("산책 기록 저장 완료: 사용자='{}', 기록 ID={}", username, savedLog.getId());
+
+        updateUserGroupsTotalDistance(user, savedLog.getDistanceMeters());
+
         return WalkLogResponse.fromEntity(savedLog);
+    }
+
+    private void updateUserGroupsTotalDistance(User user, Double distance) {
+        if (distance == null || distance <= 0) {
+            return;
+        }
+        Set<UserGroup> userGroups = user.getGroups();
+        if (userGroups != null && !userGroups.isEmpty()) {
+            for (UserGroup group : userGroups) {
+                group.setTotalDistanceMeters(group.getTotalDistanceMeters() + distance);
+            }
+            logger.info("{} 사용자가 속한 {}개 그룹의 총 이동 거리 업데이트 완료.", user.getUsername(), userGroups.size());
+        }
     }
 
     private double calculateCalories(User user, long durationSeconds, Double distanceMeters) {
