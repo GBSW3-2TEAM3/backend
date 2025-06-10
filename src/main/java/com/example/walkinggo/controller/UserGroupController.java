@@ -55,6 +55,9 @@ public class UserGroupController {
             content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "401", description = "인증 실패",
             content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "이미 다른 그룹에 가입된 사용자가 그룹 생성 시도",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "500", description = "서버 내부 오류", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping
     public ResponseEntity<?> createGroup(
             @Valid @org.springframework.web.bind.annotation.RequestBody GroupCreationRequest request,
@@ -72,9 +75,12 @@ public class UserGroupController {
         } catch (EntityNotFoundException e) {
             logger.warn("그룹 생성 실패 (사용자 없음): 사용자='{}', 메시지={}", username, e.getMessage());
             return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.BAD_REQUEST);
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            logger.warn("그룹 생성 실패 (잘못된 요청 또는 중복 코드): 사용자='{}', 메시지={}", username, e.getMessage());
+        } catch (IllegalArgumentException e) {
+            logger.warn("그룹 생성 실패 (잘못된 요청): 사용자='{}', 메시지={}", username, e.getMessage());
             return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.BAD_REQUEST);
+        } catch (IllegalStateException e) {
+            logger.warn("그룹 생성 실패 (상태 오류): 사용자='{}', 메시지={}", username, e.getMessage());
+            return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.CONFLICT);
         }
         catch (Exception e) {
             logger.error("그룹 생성 중 오류 발생: 사용자='{}', 예외 유형={}, 메시지={}", username, e.getClass().getName(), e.getMessage(), e);
@@ -86,7 +92,7 @@ public class UserGroupController {
     @ApiResponse(responseCode = "200", description = "가입 성공", content = @Content(schema = @Schema(implementation = GroupResponse.class)))
     @ApiResponse(responseCode = "400", description = "잘못된 요청 (예: 해당 코드가 공개 그룹 코드, 요청 형식 오류)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "404", description = "유효하지 않은 참가 코드", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    @ApiResponse(responseCode = "409", description = "이미 가입된 그룹", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "이미 가입된 그룹 또는 다른 그룹에 가입되어 있음", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/join")
     public ResponseEntity<?> joinPrivateGroup(
             @Valid @org.springframework.web.bind.annotation.RequestBody GroupJoinRequest request,
@@ -142,6 +148,10 @@ public class UserGroupController {
 
     @Operation(summary = "공개 그룹 가입")
     @ApiResponse(responseCode = "200", description = "가입 성공")
+    @ApiResponse(responseCode = "400", description = "잘못된 요청 (예: 해당 그룹이 비공개, 이미 가입된 그룹)",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "이미 다른 그룹에 가입되어 있음",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/{groupId}/join-public")
     public ResponseEntity<?> joinPublicGroup(@PathVariable Long groupId, @Parameter(hidden = true) @AuthenticationPrincipal UserDetails userDetails) {
         if (userDetails == null) {
@@ -154,8 +164,10 @@ public class UserGroupController {
             return ResponseEntity.ok().body("공개 그룹 가입 성공");
         } catch (EntityNotFoundException e) {
             return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.NOT_FOUND);
-        } catch (IllegalArgumentException | IllegalStateException e) {
+        } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.BAD_REQUEST);
+        } catch (IllegalStateException e) {
+            return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.CONFLICT);
         } catch (Exception e) {
             return new ResponseEntity<>(new ErrorResponse("그룹 가입 처리 중 오류 발생"), HttpStatus.INTERNAL_SERVER_ERROR);
         }
