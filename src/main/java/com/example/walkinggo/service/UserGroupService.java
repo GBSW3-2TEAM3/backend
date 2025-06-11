@@ -1,24 +1,20 @@
 package com.example.walkinggo.service;
 
-import com.example.walkinggo.dto.GroupCreationRequest;
-import com.example.walkinggo.dto.GroupResponse;
-import com.example.walkinggo.dto.RankedGroupResponse;
-import com.example.walkinggo.dto.SimpleGroupResponse;
+import com.example.walkinggo.dto.*;
 import com.example.walkinggo.entity.User;
 import com.example.walkinggo.entity.UserGroup;
 import com.example.walkinggo.repository.UserGroupRepository;
 import com.example.walkinggo.repository.UserRepository;
+import com.example.walkinggo.repository.WalkLogRepository;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,6 +23,7 @@ public class UserGroupService {
 
     private final UserGroupRepository userGroupRepository;
     private final UserRepository userRepository;
+    private final WalkLogRepository walkLogRepository;
     private final Logger logger = LoggerFactory.getLogger(UserGroupService.class);
 
     @Transactional
@@ -78,7 +75,6 @@ public class UserGroupService {
         if (group.getIsPublic()) {
             throw new IllegalArgumentException("비공개 그룹 참가는 코드를 통해서만 가능합니다.");
         }
-
         group.addMember(user);
         UserGroup savedGroup = userGroupRepository.save(group);
         return GroupResponse.fromEntity(savedGroup);
@@ -98,7 +94,9 @@ public class UserGroupService {
         if (!group.getIsPublic()) {
             throw new IllegalArgumentException("공개 그룹만 이 방법으로 참가할 수 있습니다.");
         }
-
+        if (group.getMembers().contains(user)) {
+            throw new IllegalStateException("이미 해당 그룹의 멤버입니다.");
+        }
         group.addMember(user);
         userGroupRepository.save(group);
     }
@@ -164,5 +162,46 @@ public class UserGroupService {
         }
         logger.info("공개 그룹 랭킹 (거리순) 조회 완료. 총 {}개 그룹.", rankedGroups.size());
         return rankedGroups;
+    }
+
+    @Transactional(readOnly = true)
+    public List<MemberResponse> getGroupMembers(Long groupId) {
+        UserGroup group = userGroupRepository.findById(groupId)
+                .orElseThrow(() -> new EntityNotFoundException("그룹을 찾을 수 없습니다: ID " + groupId));
+
+        return group.getMembers().stream()
+                .map(MemberResponse::new)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public GroupDetailResponse getGroupDetailsWithMemberDistances(Long groupId, String currentUsername) {
+        UserGroup group = userGroupRepository.findById(groupId)
+                .orElseThrow(() -> new EntityNotFoundException("그룹을 찾을 수 없습니다: ID " + groupId));
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다: " + currentUsername));
+
+        Set<User> members = group.getMembers();
+        if (members.isEmpty()) {
+            return GroupDetailResponse.from(group, currentUser, Collections.emptyList());
+        }
+
+        List<Object[]> distanceResults = walkLogRepository.findTotalDistanceByUsers(new ArrayList<>(members));
+        Map<Long, Double> distanceMap = distanceResults.stream()
+                .collect(Collectors.toMap(
+                        result -> (Long) result[0],
+                        result -> (Double) result[1]
+                ));
+
+        List<MemberDetailDto> memberDetailDtos = members.stream()
+                .map(member -> {
+                    Double totalDistance = distanceMap.getOrDefault(member.getId(), 0.0);
+                    boolean isMemberTheOwner = member.getId().equals(group.getOwner().getId());
+                    return new MemberDetailDto(member, totalDistance, isMemberTheOwner);
+                })
+                .sorted(Comparator.comparing(MemberDetailDto::getTotalDistanceKm).reversed())
+                .collect(Collectors.toList());
+
+        return GroupDetailResponse.from(group, currentUser, memberDetailDtos);
     }
 }
