@@ -18,4 +18,7 @@ public interface WalkLogRepository extends JpaRepository<WalkLog, Long> {
 
     @Query("SELECT DISTINCT FUNCTION('DATE', wl.startTime) FROM WalkLog wl WHERE wl.user = :user AND wl.startTime >= :startOfMonth AND wl.startTime < :endOfMonth")
     List<java.sql.Date> findActiveDatesInMonthByUser(@Param("user") User user, @Param("startOfMonth") LocalDateTime startOfMonth, @Param("endOfMonth") LocalDateTime endOfMonth);
+
+    @Query("SELECT wl.user.id, SUM(wl.distanceMeters) FROM WalkLog wl WHERE wl.user IN :users GROUP BY wl.user.id")
+    List<Object[]> findTotalDistanceByUsers(@Param("users") List<User> users);
 }
