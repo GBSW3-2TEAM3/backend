@@ -52,6 +52,7 @@ public class UserGroup {
 
     @Schema(description = "팀의 총 누적 이동 거리 (미터 단위)")
     @Column(nullable = false, columnDefinition = "DOUBLE DEFAULT 0.0")
+    @Builder.Default
     private Double totalDistanceMeters = 0.0;
 
     public void addMember(User user) {
