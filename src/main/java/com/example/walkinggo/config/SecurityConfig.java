@@ -47,7 +47,8 @@ public class SecurityConfig {
                                 AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/auth/login"),
                                 AntPathRequestMatcher.antMatcher("/swagger-ui/**"),
                                 AntPathRequestMatcher.antMatcher("/api-docs/**"),
-                                AntPathRequestMatcher.antMatcher("/webjars/**")
+                                AntPathRequestMatcher.antMatcher("/webjars/**"),
+                                AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/share/**")
                         ).permitAll()
                         .requestMatchers(AntPathRequestMatcher.antMatcher(HttpMethod.OPTIONS, "/**")).permitAll()
                         .requestMatchers(AntPathRequestMatcher.antMatcher("/api/**")).authenticated()
