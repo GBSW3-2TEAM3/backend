@@ -12,6 +12,10 @@ public class WalkLogResponse {
     private final Long id;
     @Schema(description = "사용자 아이디")
     private final String username;
+
+    @Schema(description = "사용자가 등록한 경로 이름")
+    private final String routeName;
+
     @Schema(description = "산책 시작 시간")
     private final LocalDateTime startTime;
     @Schema(description = "산책 종료 시간")
@@ -20,6 +24,10 @@ public class WalkLogResponse {
     private final Long durationSeconds;
     @Schema(description = "산책 거리 (미터)")
     private final Double distanceMeters;
+
+    @Schema(description = "총 걸음 수")
+    private final Integer steps;
+
     @Schema(description = "소모 칼로리")
     private final Double caloriesBurned;
     @Schema(description = "경로 좌표 JSON")
@@ -30,10 +38,12 @@ public class WalkLogResponse {
     public WalkLogResponse(WalkLog walkLog) {
         this.id = walkLog.getId();
         this.username = walkLog.getUser().getUsername();
+        this.routeName = walkLog.getRouteName();
         this.startTime = walkLog.getStartTime();
         this.endTime = walkLog.getEndTime();
         this.durationSeconds = walkLog.getDurationSeconds();
         this.distanceMeters = walkLog.getDistanceMeters();
+        this.steps = walkLog.getSteps();
         this.caloriesBurned = walkLog.getCaloriesBurned();
         this.routeCoordinatesJson = walkLog.getRouteCoordinatesJson();
         this.createdAt = walkLog.getCreatedAt();
