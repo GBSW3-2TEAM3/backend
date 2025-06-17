@@ -16,9 +16,11 @@ public interface WalkLogRepository extends JpaRepository<WalkLog, Long> {
     @Query("SELECT wl FROM WalkLog wl WHERE wl.user = :user AND wl.startTime >= :startOfDay AND wl.startTime < :endOfDay ORDER BY wl.startTime DESC")
     List<WalkLog> findByUserAndDate(@Param("user") User user, @Param("startOfDay") LocalDateTime startOfDay, @Param("endOfDay") LocalDateTime endOfDay);
 
-    @Query("SELECT DISTINCT FUNCTION('DATE', wl.startTime) FROM WalkLog wl WHERE wl.user = :user AND wl.startTime >= :startOfMonth AND wl.startTime < :endOfMonth")
-    List<java.sql.Date> findActiveDatesInMonthByUser(@Param("user") User user, @Param("startOfMonth") LocalDateTime startOfMonth, @Param("endOfMonth") LocalDateTime endOfMonth);
+    @Query(value = "SELECT DISTINCT DATE(start_time) FROM walk_logs WHERE user_id = :userId AND start_time >= :startOfMonth AND start_time < :endOfMonth", nativeQuery = true)
+    List<java.sql.Date> findActiveDatesInMonthByUser(@Param("userId") Long userId, @Param("startOfMonth") LocalDateTime startOfMonth, @Param("endOfMonth") LocalDateTime endOfMonth);
 
     @Query("SELECT wl.user.id, SUM(wl.distanceMeters) FROM WalkLog wl WHERE wl.user IN :users GROUP BY wl.user.id")
     List<Object[]> findTotalDistanceByUsers(@Param("users") List<User> users);
+
+    List<WalkLog> findByIsPublicRouteTrueOrderByCreatedAtDesc();
 }
