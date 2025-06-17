@@ -39,7 +39,6 @@ public class ShareService {
                     return sharedRouteRepository.save(newSharedRoute).getShareId();
                 });
     }
-
     @Transactional(readOnly = true)
     public WalkLogResponse getSharedRoute(UUID shareId) {
         SharedRoute sharedRoute = sharedRouteRepository.findByShareId(shareId)
