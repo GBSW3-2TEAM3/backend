@@ -1,9 +1,6 @@
 package com.example.walkinggo.controller;
 
-import com.example.walkinggo.dto.ErrorResponse;
-import com.example.walkinggo.dto.MonthlyActivityResponse;
-import com.example.walkinggo.dto.WalkLogRequest;
-import com.example.walkinggo.dto.WalkLogResponse;
+import com.example.walkinggo.dto.*;
 import com.example.walkinggo.service.WalkLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -19,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -105,6 +103,49 @@ public class WalkLogController {
             return ResponseEntity.ok(response);
         } catch (EntityNotFoundException e) {
             return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @Operation(summary = "산책 기록을 추천 경로로 등록", description = "자신의 산책 기록에 이름과 설명을 붙여 다른 사용자에게 추천(공개)합니다.")
+    @ApiResponse(responseCode = "200", description = "추천 경로 등록 성공")
+    @SecurityRequirement(name = "bearerAuth")
+    @PatchMapping("/{walkLogId}/publish")
+    public ResponseEntity<?> publishRoute(
+            @PathVariable Long walkLogId,
+            @Valid @RequestBody RoutePublishRequest request,
+            @Parameter(hidden = true) @AuthenticationPrincipal UserDetails userDetails) {
+
+        if (userDetails == null) {
+            return new ResponseEntity<>(new ErrorResponse("인증 정보가 없습니다."), HttpStatus.UNAUTHORIZED);
+        }
+
+        try {
+            walkLogService.publishRoute(walkLogId, request, userDetails.getUsername());
+            return ResponseEntity.ok("경로가 성공적으로 추천 목록에 등록되었습니다.");
+        } catch (EntityNotFoundException e) {
+            return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.NOT_FOUND);
+        } catch (AccessDeniedException e) {
+            return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.FORBIDDEN);
+        }
+    }
+
+    @Operation(summary = "추천 경로 목록 조회", description = "모든 사용자가 볼 수 있는 추천(공개) 경로 목록을 조회합니다.")
+    @GetMapping("/recommended")
+    public ResponseEntity<List<RecommendedRouteResponse>> getRecommendedRoutes() {
+        List<RecommendedRouteResponse> routes = walkLogService.getRecommendedRoutes();
+        return ResponseEntity.ok(routes);
+    }
+
+    @Operation(summary = "추천 경로 상세 조회", description = "ID를 통해 특정 추천(공개) 경로의 상세 정보를 조회합니다.")
+    @GetMapping("/{walkLogId}/details")
+    public ResponseEntity<?> getPublicRouteDetails(@PathVariable Long walkLogId) {
+        try {
+            WalkLogResponse response = walkLogService.getPublicRouteDetails(walkLogId);
+            return ResponseEntity.ok(response);
+        } catch (EntityNotFoundException e) {
+            return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.NOT_FOUND);
+        } catch (AccessDeniedException e) {
+            return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.FORBIDDEN);
         }
     }
 }
