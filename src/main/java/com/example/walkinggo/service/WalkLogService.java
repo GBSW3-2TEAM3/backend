@@ -1,6 +1,8 @@
 package com.example.walkinggo.service;
 
 import com.example.walkinggo.dto.MonthlyActivityResponse;
+import com.example.walkinggo.dto.RecommendedRouteResponse;
+import com.example.walkinggo.dto.RoutePublishRequest;
 import com.example.walkinggo.dto.WalkLogRequest;
 import com.example.walkinggo.dto.WalkLogResponse;
 import com.example.walkinggo.entity.User;
@@ -13,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -45,7 +48,7 @@ public class WalkLogService {
 
         double caloriesBurned = request.getCaloriesBurned() != null ?
                 request.getCaloriesBurned() :
-                calculateCalories(user, durationSeconds, request.getDistanceMeters());
+                calculateCalories(user, durationSeconds);
 
 
         WalkLog walkLog = WalkLog.builder()
@@ -80,13 +83,12 @@ public class WalkLogService {
         }
     }
 
-    private double calculateCalories(User user, long durationSeconds, Double distanceMeters) {
+    private double calculateCalories(User user, long durationSeconds) {
         double weightKg = 70.0;
 
         if (user.getWeightKg() != null ) {
             weightKg = user.getWeightKg();
         }
-
 
         double durationHours = durationSeconds / 3600.0;
         return WALKING_MET * weightKg * durationHours;
@@ -118,11 +120,48 @@ public class WalkLogService {
         LocalDateTime startOfMonth = yearMonth.atDay(1).atStartOfDay();
         LocalDateTime endOfMonth = yearMonth.plusMonths(1).atDay(1).atStartOfDay();
 
-        Set<LocalDate> activeDates = walkLogRepository.findActiveDatesInMonthByUser(user, startOfMonth, endOfMonth)
+        List<java.sql.Date> activeSqlDates = walkLogRepository.findActiveDatesInMonthByUser(user.getId(), startOfMonth, endOfMonth);
+
+        Set<LocalDate> activeDates = activeSqlDates
                 .stream()
-                .map(sqlDate -> sqlDate.toLocalDate())
+                .map(java.sql.Date::toLocalDate)
                 .collect(Collectors.toSet());
 
         return new MonthlyActivityResponse(activeDates);
+    }
+
+    @Transactional
+    public void publishRoute(Long walkLogId, RoutePublishRequest request, String username) {
+        WalkLog walkLog = walkLogRepository.findById(walkLogId)
+                .orElseThrow(() -> new EntityNotFoundException("해당 산책 기록을 찾을 수 없습니다."));
+
+        if (!walkLog.getUser().getUsername().equals(username)) {
+            throw new AccessDeniedException("자신의 산책 기록만 추천 경로로 등록할 수 있습니다.");
+        }
+
+        walkLog.setRouteName(request.getRouteName());
+        walkLog.setRouteDescription(request.getRouteDescription());
+        walkLog.setPublicRoute(true);
+
+        walkLogRepository.save(walkLog);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RecommendedRouteResponse> getRecommendedRoutes() {
+        return walkLogRepository.findByIsPublicRouteTrueOrderByCreatedAtDesc().stream()
+                .map(RecommendedRouteResponse::new)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public WalkLogResponse getPublicRouteDetails(Long walkLogId) {
+        WalkLog walkLog = walkLogRepository.findById(walkLogId)
+                .orElseThrow(() -> new EntityNotFoundException("해당 산책 기록을 찾을 수 없습니다."));
+
+        if (!walkLog.isPublicRoute()) {
+            throw new AccessDeniedException("공개된 경로만 조회할 수 있습니다.");
+        }
+
+        return WalkLogResponse.fromEntity(walkLog);
     }
 }
