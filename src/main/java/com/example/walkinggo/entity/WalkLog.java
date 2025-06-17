@@ -1,5 +1,6 @@
 package com.example.walkinggo.entity;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -24,18 +25,18 @@ public class WalkLog {
     private User user;
 
     @Column(nullable = false)
-    private LocalDateTime startTime; // 산책 시작 시간
+    private LocalDateTime startTime;
 
     @Column(nullable = false)
-    private LocalDateTime endTime; // 산책 종료 시간
+    private LocalDateTime endTime;
 
-    private Long durationSeconds; // 산책 시간 (초)
+    private Long durationSeconds;
 
-    private Double distanceMeters; // 산책 거리 (미터)
+    private Double distanceMeters;
 
-    private Integer steps; // 걸음 수
+    private Integer steps;
 
-    private Double caloriesBurned; // 소모 칼로리
+    private Double caloriesBurned;
 
     @Lob
     @Column(columnDefinition = "TEXT")
@@ -44,4 +45,17 @@ public class WalkLog {
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Schema(description = "사용자가 등록한 경로 이름 (공개 시 사용)")
+    @Column(length = 100)
+    private String routeName;
+
+    @Schema(description = "사용자가 등록한 경로 설명 (공개 시 사용)")
+    @Column(length = 500)
+    private String routeDescription;
+
+    @Schema(description = "경로 공개(추천) 여부")
+    @Column(nullable = false)
+    private boolean isPublicRoute = false;
+
 }
